@@ -1,0 +1,97 @@
+/* GERADO por scripts/sync-tokens.mjs a partir de design-system/tokens/tokens.css. Não edite aqui. */
+/*
+ * Design Tokens v0.2 — Painel Admin
+ * Regra do projeto: organização e aparência orientadas pelo painel de referência (iMPlayer, Fase 2);
+ * do SFL Grupo vêm SOMENTE as cores-base. Detalhes e contrastes em docs/DESIGN_TOKENS.md.
+ * [sfl] cor-base do SFL · [der] tom derivado de uma cor-base (para contraste) · [neu] neutro genérico
+ */
+:root {
+  /* ---------- Cores-base SFL e tons derivados ---------- */
+  --color-blue-50: #EDF4FC;   /* [der] fundo de seleção/informação */
+  --color-blue-500: #4A90E2;  /* [sfl] cor primária */
+  --color-blue-600: #2F6DB5;  /* [der] botão primário e links (branco 5,3:1) */
+  --color-green-50: #E6F6ED;  /* [der] */
+  --color-green-500: #00A651; /* [sfl] sucesso, "gerenciado", chaves ligadas */
+  --color-green-700: #007A3D; /* [der] texto verde e botão de confirmar (branco 5,5:1) */
+  --color-yellow-50: #FEFBE0; /* [der] */
+  --color-yellow-400: #F8E71C;/* [sfl] destaque, aviso, foco em fundo escuro */
+  --color-yellow-ink: #6B6300;/* [der] texto de aviso em fundo claro (6,2:1) */
+  --color-navy-900: #15192A;  /* [sfl] sidebar e cabeçalho de página */
+  --color-navy-800: #1E2338;  /* [der] item ativo / hover na sidebar */
+  --color-navy-700: #2A3050;  /* [der] bordas no escuro */
+
+  /* ---------- Neutros ---------- */
+  --color-page: #F4F6FA;          /* [neu] fundo da área de conteúdo */
+  --color-surface: #FFFFFF;       /* [neu] cards */
+  --color-surface-muted: #F8FAFC; /* [neu] linhas alternadas, cabeçalho de tabela */
+  --color-border: #E2E8F0;        /* [neu] */
+  --color-border-strong: #CBD5E1; /* [neu] campos */
+  --color-text: #0F172A;          /* [neu] 16,5:1 sobre page */
+  --color-text-secondary: #475569;/* [neu] 7,6:1 */
+  --color-text-muted: #5B677D;    /* [neu] legendas; não usar abaixo de 12px */
+  --color-text-on-dark: #FFFFFF;
+  --color-text-on-dark-muted: #A9B1C6; /* [neu] 8,1:1 sobre navy-900 */
+
+  /* ---------- Semânticas ---------- */
+  --color-primary: var(--color-blue-600);
+  --color-primary-hover: #285E9C;
+  --color-success: var(--color-green-700);
+  --color-success-bg: var(--color-green-50);
+  --color-warning: var(--color-yellow-ink);
+  --color-warning-bg: var(--color-yellow-50);
+  --color-danger: #C81E28;        /* [neu] o SFL não define vermelho */
+  --color-danger-bg: #FDECEC;
+  --color-info: var(--color-blue-600);
+  --color-info-bg: var(--color-blue-50);
+
+  /* ---------- Tipografia (pilha do sistema; nenhuma fonte de marca) ---------- */
+  --font-sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;   /* corpo do painel */
+  --text-lg: 16px;
+  --text-xl: 18px;   /* título de card */
+  --text-2xl: 22px;  /* título de seção */
+  --text-3xl: 28px;  /* título do cabeçalho de página */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --overline-size: 11px;
+  --overline-tracking: 0.08em;
+
+  /* ---------- Espaçamento (base 4) ---------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  /* ---------- Raios ---------- */
+  --radius-sm: 8px;    /* chips, selos quadrados */
+  --radius-md: 12px;   /* campos, botões */
+  --radius-lg: 16px;   /* cards */
+  --radius-xl: 20px;   /* sidebar e cabeçalho de página */
+  --radius-full: 9999px;
+
+  /* ---------- Elevação ---------- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-overlay: 0 24px 64px rgba(15, 23, 42, 0.24);
+
+  /* ---------- Foco ---------- */
+  --focus-ring: 0 0 0 3px rgba(74, 144, 226, 0.5);        /* fundo claro */
+  --focus-ring-dark: 0 0 0 2px var(--color-yellow-400);   /* fundo escuro (sidebar, cabeçalho) */
+
+  /* ---------- Layout ---------- */
+  --sidebar-width: 264px;
+  --content-max: 1360px;
+  --touch-min: 44px;
+
+  /* ---------- Movimento ---------- */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration-base: 0ms; }
+}

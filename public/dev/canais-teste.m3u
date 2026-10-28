@@ -1,0 +1,8 @@
+#EXTM3U
+# Lista de TESTE para desenvolvimento do app (streams públicos de demonstração). Não usar em produção.
+#EXTINF:-1 tvg-name="Teste Mux" group-title="Testes",Teste 1 – Mux (Big Buck Bunny)
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+#EXTINF:-1 tvg-name="Teste Apple" group-title="Testes",Teste 2 – Apple bipbop
+https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8
+#EXTINF:-1 tvg-name="Teste Tears" group-title="Filmes abertos",Teste 3 – Tears of Steel
+https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8
