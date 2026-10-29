@@ -1,6 +1,8 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { clearRateLimit, clientIp, rateLimit } from "@/server/rate-limit";
 import { getDb } from "@/server/db/client";
 import { createFirstAdmin, login, logout } from "@/server/services/admins";
 import { ServiceError } from "@/server/services/errors";
@@ -8,8 +10,14 @@ import { clearSessionCookie, readSessionToken, setSessionCookie } from "@/server
 import type { ActionResult } from "@/components/forms";
 
 export async function loginAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const ip = clientIp(await headers());
   try {
-    const session = await login(await getDb(), String(form.get("email") ?? ""), String(form.get("password") ?? ""));
+    // Password guessing: at most 10 tries per account and 30 per address every 15 minutes.
+    rateLimit(`login:${email}`, 10, 15 * 60_000, "Muitas tentativas para esta conta. Aguarde 15 minutos.");
+    rateLimit(`login-ip:${ip}`, 30, 15 * 60_000, "Muitas tentativas deste endereço. Aguarde 15 minutos.");
+    const session = await login(await getDb(), email, String(form.get("password") ?? ""));
+    clearRateLimit(`login:${email}`);
     await setSessionCookie(session.token, session.expiresAt);
   } catch (e) {
     if (e instanceof ServiceError) return { error: e.message };

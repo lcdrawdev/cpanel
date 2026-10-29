@@ -5,6 +5,7 @@ import type { Database } from "../db/create";
 import { devices } from "../db/schema";
 import { sha256 } from "../crypto";
 import { ServiceError } from "./errors";
+import { rateLimit } from "../rate-limit";
 import { audit } from "./audit";
 import { notify } from "./notifications";
 
@@ -56,19 +57,10 @@ export async function startPairing(db: Database, input: z.infer<typeof pairingSc
   return { status: "waiting", mac, code, expiresInSec: CODE_TTL_MS / 1000, url: activationUrl };
 }
 
-// Tries per address in the last minute (in memory: one panel process).
-const tries = new Map<string, number[]>();
-function limit(ip: string) {
-  const now = Date.now();
-  const recent = (tries.get(ip) ?? []).filter((t) => now - t < 60_000);
-  if (recent.length >= 10) throw new ServiceError("rate_limited", "Muitas tentativas. Aguarde um minuto e tente de novo.", 429);
-  recent.push(now);
-  tries.set(ip, recent);
-}
 
 /** The /ativar page: MAC + code shown on the TV. Right → the device becomes active and the TV enters by itself. */
 export async function confirmPairing(db: Database, macInput: string, codeInput: string, ip: string) {
-  limit(ip);
+  rateLimit(`pair:${ip}`, 10, 60_000, "Muitas tentativas. Aguarde um minuto e tente de novo.");
   const mac = normalizeMac(macInput);
   const code = codeInput.replace(/\D/g, "");
   if (!mac || code.length !== 6) throw new ServiceError("invalid", "Confira o endereço MAC e o código de 6 números mostrados na TV.");
