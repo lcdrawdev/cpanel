@@ -25,19 +25,26 @@ function fromEnvLocal(key: string): string | undefined {
   return undefined;
 }
 
-const url = fromEnvLocal("MIGRATE_DATABASE_URL") ?? fromEnvLocal("DATABASE_URL");
-if (!url) {
-  console.error("Defina DATABASE_URL (ou MIGRATE_DATABASE_URL) com a conexão direta do Supabase.");
-  process.exit(1);
+async function main() {
+  const url = fromEnvLocal("MIGRATE_DATABASE_URL") ?? fromEnvLocal("DATABASE_URL");
+  if (!url) {
+    console.error("Defina DATABASE_URL (ou MIGRATE_DATABASE_URL) com a conexão direta do Supabase.");
+    process.exit(1);
+  }
+
+  const host = new URL(url).host;
+  if (host.includes("pooler.supabase.com")) {
+    console.error(`\nUse a conexão DIRETA (porta 5432), não o pooler. Host informado: ${host}\n`);
+    process.exit(1);
+  }
+
+  console.log(`Aplicando migrações em ${host}…`);
+  await createDatabase({ databaseUrl: url, migrate: true });
+  console.log("Migrações aplicadas. Pode recarregar o painel no Vercel.");
+  process.exit(0);
 }
 
-const host = new URL(url).host;
-if (host.includes("pooler.supabase.com")) {
-  console.error(`\nUse a conexão DIRETA (porta 5432), não o pooler. Host informado: ${host}\n`);
+main().catch((e) => {
+  console.error("\nFalha ao migrar:", e?.message ?? e, "\n");
   process.exit(1);
-}
-
-console.log(`Aplicando migrações em ${host}…`);
-await createDatabase({ databaseUrl: url, migrate: true });
-console.log("Migrações aplicadas. Pode recarregar o painel no Vercel.");
-process.exit(0);
+});
