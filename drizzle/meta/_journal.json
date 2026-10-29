@@ -99,6 +99,13 @@
       "when": 1793285075108,
       "tag": "0013_device_pairing",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793300852681,
+      "tag": "0014_plan_expiry",
+      "breakpoints": true
     }
   ]
 }

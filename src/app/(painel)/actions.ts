@@ -6,7 +6,7 @@ import { getDb } from "@/server/db/client";
 import { requireAdmin } from "@/server/session";
 import { ServiceError } from "@/server/services/errors";
 import { changePassword } from "@/server/services/admins";
-import { addDevice, removeDevice, renameDevice, setDeviceBlocked, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
+import { addDevice, removeDevice, renameDevice, setDeviceBlocked, setDevicePlan, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
 import { createCode, deleteCode, setCodeEnabled } from "@/server/services/codes";
 import { createProfile, deleteProfile, updateProfileSettings } from "@/server/services/profiles";
 import { connectDeviceXtream, createPlaylist, deletePlaylist, updatePlaylist, type PlaylistInput } from "@/server/services/playlists";
@@ -52,6 +52,13 @@ export async function addDeviceAction(_p: ActionResult, form: FormData) {
 
 export async function renameDeviceAction(_p: ActionResult, form: FormData) {
   return run(async (actor) => renameDevice(await getDb(), actor, str(form, "id"), str(form, "nickname"), form.has("customerName") ? str(form, "customerName") : undefined));
+}
+
+export async function setDevicePlanAction(_p: ActionResult, form: FormData) {
+  return run(async (actor) => {
+    await setDevicePlan(await getDb(), actor, str(form, "id"), str(form, "planExpiresAt"), Number(str(form, "expiryNoticeDays")));
+    return str(form, "planExpiresAt") ? "Vencimento salvo. A TV avisa o cliente nos dias antes." : "Vencimento removido.";
+  });
 }
 
 export async function connectDeviceXtreamAction(_p: ActionResult, form: FormData) {

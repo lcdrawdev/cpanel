@@ -121,7 +121,11 @@ export async function deviceConfig(db: DbOrTx, deviceUuid: string) {
   const shared = sync.active ? (await playlistsByIds(db, sync.poolPlaylistIds)).filter((p) => !own.some((o) => o.id === p.id)) : [];
   return {
     version: device.configVersion + account.version,
-    device: { nickname: device.nickname, customerName: device.customerName || null },
+    device: {
+      nickname: device.nickname, customerName: device.customerName || null,
+      // The TV shows the due-date warning in the bell from expiryNoticeDays before.
+      planExpiresAt: device.planExpiresAt?.toISOString() ?? null, expiryNoticeDays: device.expiryNoticeDays,
+    },
     account: accountConfig(account, portals),
     // Device-only overrides win over the (shared or own) profile.
     settings: { ...resolveSettings((sync.active && sync.profile ? sync.profile : profile)?.settings), ...settingsSchema.parse(device.settingsOverrides ?? {}) },

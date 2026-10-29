@@ -99,6 +99,9 @@ export const devices = pgTable("devices", {
   pairingCodeHash: text("pairing_code_hash"),
   pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true }),
   pairingAttempts: integer("pairing_attempts").notNull().default(0),
+  // Customer's plan: due date and how many days before (5, 3 or 2) the TV starts warning about it.
+  planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
+  expiryNoticeDays: integer("expiry_notice_days").notNull().default(5),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

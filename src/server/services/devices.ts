@@ -86,6 +86,24 @@ export async function renameDevice(db: Database, actor: string, id: string, nick
   await audit(db, actor, "device.renamed", id);
 }
 
+export const EXPIRY_NOTICE_DAYS = [5, 3, 2] as const;
+
+/**
+ * Due date of the customer's plan ("YYYY-MM-DD", empty to clear) and how many days before it the TV
+ * warns (bell message). The plan lasts until the end of that day in Brasília time.
+ */
+export async function setDevicePlan(db: Database, actor: string, id: string, date: string, noticeDays: number) {
+  if (!EXPIRY_NOTICE_DAYS.includes(noticeDays as (typeof EXPIRY_NOTICE_DAYS)[number])) throw new ServiceError("invalid", "Escolha avisar com 5, 3 ou 2 dias de antecedência.");
+  let planExpiresAt: Date | null = null;
+  const day = date.trim();
+  if (day) {
+    planExpiresAt = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T23:59:59-03:00`) : new Date(NaN);
+    if (Number.isNaN(planExpiresAt.getTime())) throw new ServiceError("invalid", "Data de vencimento inválida.");
+  }
+  await touch(db, id, { planExpiresAt, expiryNoticeDays: noticeDays });
+  await audit(db, actor, "device.plan_set", id);
+}
+
 export async function setDeviceProfile(db: Database, actor: string, id: string, profileId: string | null) {
   await touch(db, id, { profileId });
   await audit(db, actor, "device.profile_set", id);

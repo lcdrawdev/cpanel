@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ArrowLeft, Camera, Info, KeyRound, Layers, ListVideo, Plug, SlidersVertical, MonitorSmartphone, Settings2, ShieldAlert, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, CalendarClock, Camera, Info, KeyRound, Layers, ListVideo, Plug, SlidersVertical, MonitorSmartphone, Settings2, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { Alert, Card, CardHead, EmptyState, Fact, PageHeader, SkeletonCard } from "@/components/ui";
 import { ActionForm, ConfirmSubmit, SubmitButton } from "@/components/forms";
 import { DeviceStatus, PLATFORM_LABEL, PROFILE_PLATFORM_LABEL, formatDate } from "@/components/device-bits";
@@ -17,7 +17,7 @@ import { OverridesSection, CopiesSection } from "./extra-sections";
 import { ServiceError } from "@/server/services/errors";
 import { SETTING_GROUPS, resolveSettings } from "@/shared/settings";
 import {
-  connectDeviceXtreamAction, removeDeviceAction, renameDeviceAction, setDeviceBlockedAction, setDeviceGroupAction, setDevicePlaylistsAction, setDeviceProfileAction,
+  connectDeviceXtreamAction, removeDeviceAction, renameDeviceAction, setDeviceBlockedAction, setDeviceGroupAction, setDevicePlanAction, setDevicePlaylistsAction, setDeviceProfileAction,
 } from "../../actions";
 
 export const metadata: Metadata = { title: "Painel do dispositivo" };
@@ -105,6 +105,7 @@ function InfoSection({ device, servers }: { device: Device; servers: string[] })
             <Fact label="Status"><DeviceStatus status={device.status} /></Fact>
             <Fact label="Plataforma">{PLATFORM_LABEL[device.platform]}</Fact>
             <Fact label="Modelo">{device.model ?? "—"}</Fact>
+            <Fact label="Vencimento do plano">{planLabel(device.planExpiresAt)}</Fact>
             <Fact label="Versão do app">{device.appVersion ?? "—"}</Fact>
             <Fact label="Último contato">{formatDate(device.lastSeenAt)}</Fact>
             <Fact label="Perfil">{device.profile?.name ?? "Nenhum"}</Fact>
@@ -131,8 +132,51 @@ function InfoSection({ device, servers }: { device: Device; servers: string[] })
           </ActionForm>
         </div>
       </Card>
+      <PlanCard device={device} />
       <XtreamLoginCard device={device} servers={servers} />
     </>
+  );
+}
+
+/** Due date shown in Brasília time, with the days left ("vence em 3 dias", "venceu há 2 dias"). */
+function planLabel(at: Date | null) {
+  if (!at) return "Sem vencimento";
+  const day = (d: Date) => new Date(d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })).getTime();
+  const left = Math.round((day(at) - day(new Date())) / 86_400_000);
+  const date = at.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  if (left > 1) return `${date} (vence em ${left} dias)`;
+  if (left === 1) return `${date} (vence amanhã)`;
+  if (left === 0) return `${date} (vence hoje)`;
+  return `${date} (venceu há ${-left} ${left === -1 ? "dia" : "dias"})`;
+}
+
+/** Plan due date and how many days before the TV warns the customer (bell blinking with the message). */
+function PlanCard({ device }: { device: Device }) {
+  const value = device.planExpiresAt ? device.planExpiresAt.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) : "";
+  return (
+    <Card>
+      <CardHead icon={CalendarClock} overline="Plano" title="Vencimento do cliente" description="Data em que o plano vence. A TV mostra o aviso no sininho nos dias antes, até o cliente renovar." />
+      <div className="card-body">
+        <ActionForm action={setDevicePlanAction}>
+          <input type="hidden" name="id" value={device.id} />
+          <div className="field">
+            <label htmlFor="planExpiresAt">Data de vencimento</label>
+            <input id="planExpiresAt" name="planExpiresAt" type="date" className="input" defaultValue={value} />
+            <p className="hint">Em branco, o cliente não recebe aviso de vencimento. Atual: {planLabel(device.planExpiresAt)}.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="expiryNoticeDays">Avisar o cliente</label>
+            <select id="expiryNoticeDays" name="expiryNoticeDays" className="input" defaultValue={String(device.expiryNoticeDays)}>
+              <option value="5">5 dias antes</option>
+              <option value="3">3 dias antes</option>
+              <option value="2">2 dias antes</option>
+            </select>
+            <p className="hint">A partir desse dia o sininho da TV pisca com “Seu plano vence em X dias”, um aviso novo a cada dia.</p>
+          </div>
+          <div className="form-actions"><SubmitButton>Salvar vencimento</SubmitButton></div>
+        </ActionForm>
+      </div>
+    </Card>
   );
 }
 
