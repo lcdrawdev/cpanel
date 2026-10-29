@@ -288,7 +288,7 @@ export const auditLog = pgTable("audit_log", {
 
 // ---------- Smart TV assistant (docs: "Assistente Inteligente de TV") ----------
 
-export type AssistantTeam = { id: string; name: string; badge: string | null; sport: string | null };
+export type AssistantTeam = { id: string; name: string; badge: string | null; sport: string | null; league?: string | null; country?: string | null };
 export type AssistantSeries = {
   seriesId: string;
   playlistId: string;

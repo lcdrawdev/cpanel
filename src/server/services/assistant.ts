@@ -169,8 +169,8 @@ export async function recordEvents(db: DbOrTx, device: Device, input: unknown) {
 const topOf = (m: Record<string, number>, n: number) => Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
 
 export const profileSchema = z.object({
-  teams: z.array(z.object({ id: z.string().max(20), name: z.string().max(80), badge: z.string().max(400).nullable(), sport: z.string().max(40).nullable() })).max(5).optional(),
-  series: z.array(z.object({ seriesId: z.string().max(40), playlistId: z.string().max(40), name: z.string().max(200), poster: z.string().max(600).nullable(), following: z.boolean(), episodes: z.number().int().min(0).nullable().optional() })).max(40).optional(),
+  teams: z.array(z.object({ id: z.string().max(20), name: z.string().max(80), badge: z.string().max(400).nullish().transform((x) => x ?? null), sport: z.string().max(40).nullish().transform((x) => x ?? null), league: z.string().max(80).nullable().optional(), country: z.string().max(40).nullable().optional() })).max(1, "Escolha apenas um time.").optional(),
+  series: z.array(z.object({ seriesId: z.string().max(40), playlistId: z.string().max(40), name: z.string().max(200), poster: z.string().max(600).nullish().transform((x) => x ?? null), following: z.boolean(), episodes: z.number().int().min(0).nullable().optional(), genres: z.array(z.string().max(60)).max(8).optional() })).max(40).optional(),
 });
 
 /** Teams chosen and series followed or unfollowed by the viewer. */
@@ -178,15 +178,26 @@ export async function updateProfile(db: DbOrTx, device: Device, input: unknown) 
   const v = profileSchema.parse(input);
   const p = await getProfile(db, device);
   const set: Partial<Profile> = {};
-  if (v.teams) set.teams = v.teams satisfies AssistantTeam[];
+  if (v.teams) {
+    // A club picked from the table comes without its provider id: look it up now (or on the next feed if the provider is busy).
+    set.teams = await Promise.all(v.teams.map(async (t) => {
+      if (t.id) return t satisfies AssistantTeam;
+      const r = await resolveTeam(db, t.name, t.country ?? null).catch(() => null);
+      return r ? { id: r.id, name: t.name, badge: r.badge, sport: r.sport, league: r.league, country: t.country ?? null } : { ...t, country: t.country ?? null };
+    }));
+  }
   if (v.series) {
     const series = p.series.map((s) => ({ ...s }));
+    const genres = { ...p.genres };
     for (const s of v.series) {
       const cur = series.find((x) => x.seriesId === s.seriesId && x.playlistId === s.playlistId);
+      // Marking a series as favourite tells the assistant its genres are liked (worth an hour of watching).
+      if (s.following && !cur?.following) for (const g of genreKeys(s.genres ?? [])) genres[g] = (genres[g] ?? 0) + 60;
       if (cur) { cur.following = s.following; if (s.episodes != null) cur.knownEpisodes = Math.max(cur.knownEpisodes ?? 0, s.episodes); }
       else series.unshift({ seriesId: s.seriesId, playlistId: s.playlistId, name: s.name, poster: s.poster, watched: 0, following: s.following, knownEpisodes: s.episodes ?? null });
     }
     set.series = series.slice(0, 40);
+    set.genres = genres;
   }
   await db.update(assistantProfiles).set({ ...set, updatedAt: new Date() }).where(eq(assistantProfiles.deviceId, device.id));
   return profileView(await getProfile(db, device));
@@ -204,6 +215,45 @@ export function profileView(p: Profile) {
 
 // ---------- sports (TheSportsDB) ----------
 
+// The free TheSportsDB key cannot list a country's clubs (it answers with a fixed sample), so the table of
+// teams is kept here: the main clubs of each country. A chosen club gets its TheSportsDB id by name search.
+const T = (country: string, name: string, teams: string) => ({ id: country, name, teams: teams.split("|") });
+
+/** Countries and clubs offered in Configurações › Meu time (TheSportsDB country name, label shown on the TV). */
+export const TEAM_COUNTRIES = [
+  T("Brazil", "Brasil", "América Mineiro|Athletico Paranaense|Atlético Goianiense|Atlético Mineiro|Avaí|Bahia|Botafogo|Ceará|Chapecoense|Corinthians|Coritiba|Criciúma|Cruzeiro|Cuiabá|Flamengo|Fluminense|Fortaleza|Goiás|Grêmio|Guarani|Internacional|Juventude|Mirassol|Náutico|Palmeiras|Paysandu|Ponte Preta|Red Bull Bragantino|Remo|Santos|São Paulo|Sport Recife|Vasco da Gama|Vitória"),
+  T("Portugal", "Portugal", "Alverca|Arouca|AVS|Benfica|Boavista|Braga|Casa Pia|Estoril|Estrela da Amadora|Famalicão|Gil Vicente|Marítimo|Moreirense|Nacional|Porto|Rio Ave|Santa Clara|Sporting CP|Tondela|Vitória de Guimarães"),
+  T("Argentina", "Argentina", "Argentinos Juniors|Belgrano|Boca Juniors|Estudiantes|Gimnasia La Plata|Godoy Cruz|Huracán|Independiente|Lanús|Newell's Old Boys|Racing Club|River Plate|Rosario Central|San Lorenzo|Talleres|Vélez Sarsfield"),
+  T("Spain", "Espanha", "Alavés|Athletic Bilbao|Atlético Madrid|Barcelona|Celta Vigo|Elche|Espanyol|Getafe|Girona|Levante|Mallorca|Osasuna|Rayo Vallecano|Real Betis|Real Madrid|Real Oviedo|Real Sociedad|Sevilla|Valencia|Villarreal"),
+  T("England", "Inglaterra", "Arsenal|Aston Villa|Bournemouth|Brentford|Brighton|Burnley|Chelsea|Crystal Palace|Everton|Fulham|Leeds United|Liverpool|Manchester City|Manchester United|Newcastle United|Nottingham Forest|Sunderland|Tottenham Hotspur|West Ham United|Wolverhampton"),
+  T("Italy", "Itália", "AC Milan|Atalanta|Bologna|Cagliari|Como|Cremonese|Fiorentina|Genoa|Inter Milan|Juventus|Lazio|Lecce|Napoli|Parma|Pisa|Roma|Sassuolo|Torino|Udinese|Verona"),
+  T("Germany", "Alemanha", "Augsburg|Bayer Leverkusen|Bayern Munich|Borussia Dortmund|Borussia Mönchengladbach|Eintracht Frankfurt|FC Köln|Freiburg|Hamburger SV|Heidenheim|Hoffenheim|Mainz|RB Leipzig|St. Pauli|Union Berlin|VfB Stuttgart|Werder Bremen|Wolfsburg"),
+  T("France", "França", "Angers|Auxerre|Brest|Le Havre|Lens|Lille|Lorient|Lyon|Marseille|Metz|Monaco|Nantes|Nice|Paris FC|Paris Saint-Germain|Rennes|Strasbourg|Toulouse"),
+  T("Netherlands", "Holanda", "Ajax|AZ Alkmaar|Feyenoord|PSV Eindhoven|Twente|Utrecht"),
+  T("USA", "Estados Unidos", "Atlanta United|Columbus Crew|Inter Miami|LA Galaxy|Los Angeles FC|New York City FC|New York Red Bulls|Orlando City|Philadelphia Union|Seattle Sounders"),
+  T("Mexico", "México", "América|Cruz Azul|Guadalajara|León|Monterrey|Pachuca|Pumas UNAM|Santos Laguna|Tigres UANL|Toluca"),
+  T("Uruguay", "Uruguai", "Danubio|Defensor Sporting|Liverpool Montevideo|Nacional Montevideo|Peñarol"),
+  T("Colombia", "Colômbia", "América de Cali|Atlético Nacional|Deportivo Cali|Independiente Medellín|Junior|Millonarios|Santa Fe"),
+  T("Chile", "Chile", "Colo-Colo|Universidad Católica|Universidad de Chile"),
+  T("Paraguay", "Paraguai", "Cerro Porteño|Libertad|Olimpia"),
+  T("Saudi Arabia", "Arábia Saudita", "Al Ahli|Al Hilal|Al Ittihad|Al Nassr"),
+];
+
+/** Clubs of one country for the picker (TheSportsDB id filled in when one is chosen). */
+export function teamsByCountry(country: string) {
+  const c = TEAM_COUNTRIES.find((x) => x.id === country);
+  if (!c) return [];
+  return c.teams.map((name) => ({ id: "", name, badge: null, sport: "Soccer", league: null, country: c.id }));
+}
+
+/** TheSportsDB id of a club picked from the table: a football team of that country with that name. */
+async function resolveTeam(db: DbOrTx, name: string, country: string | null) {
+  const found = (await searchTeams(db, name)).filter((t) => t.sport === "Soccer");
+  return found.find((t) => country && t.country === country && norm(t.name) === norm(name))
+    ?? found.find((t) => country && t.country === country)
+    ?? found.find((t) => norm(t.name) === norm(name))
+    ?? found[0] ?? null;
+}
 async function sportsKey(db: DbOrTx) {
   const s = await getAccountSettings(db);
   return s.sportsDbKey ? decryptSecret(s.sportsDbKey) : "123";
@@ -223,7 +273,6 @@ export async function searchTeams(db: DbOrTx, q: string) {
   });
   return rows ?? [];
 }
-
 type EventRow = { idEvent: string; strTimestamp?: string | null; dateEvent?: string; strTime?: string; strHomeTeam: string; strAwayTeam: string; strLeague?: string | null; strHomeTeamBadge?: string | null; strAwayTeamBadge?: string | null; strThumb?: string | null };
 export type NextGame = { id: string; home: string; away: string; league: string | null; startsAt: string; homeBadge: string | null; awayBadge: string | null; image: string | null };
 
@@ -354,7 +403,12 @@ export type Card = {
 async function matchCards(db: DbOrTx, p: Profile, now: number): Promise<Card[]> {
   const out: Card[] = [];
   for (const team of p.teams.slice(0, 5)) {
-    const games = await nextGames(db, team.id).catch(() => []);
+    let id = team.id;
+    if (!id) {
+      id = (await resolveTeam(db, team.name, team.country ?? null).catch(() => null))?.id ?? "";
+      if (id) await db.update(assistantProfiles).set({ teams: p.teams.map((t) => (t === team ? { ...t, id } : t)) }).where(eq(assistantProfiles.deviceId, p.deviceId));
+    }
+    const games = await nextGames(db, id).catch(() => []);
     const g = games.find((x) => Date.parse(x.startsAt) > now - 2 * HOUR);
     if (!g) continue;
     const start = Date.parse(g.startsAt);
@@ -492,7 +546,8 @@ export async function ask(db: DbOrTx, device: Device, input: unknown) {
     const name = fav[1].replace(/^(o|a|do|da|pelo|pela) /, "");
     const found = (await searchTeams(db, name).catch(() => []))[0];
     if (!found) return { intent: "team", answer: `Não achei o time "${name}". Tente falar o nome completo.` };
-    const teams = [{ id: found.id, name: found.name, badge: found.badge, sport: found.sport }, ...p.teams.filter((t) => t.id !== found.id)].slice(0, 5);
+    // One favourite team per TV: a new one replaces the old.
+    const teams = [{ id: found.id, name: found.name, badge: found.badge, sport: found.sport }];
     await db.update(assistantProfiles).set({ teams }).where(eq(assistantProfiles.deviceId, device.id));
     const g = (await nextGames(db, found.id).catch(() => []))[0];
     return { intent: "team", answer: `Pronto, ${found.name} é o seu time.${g ? ` Próximo jogo: ${g.home} x ${g.away}, ${when(g.startsAt, tz)}.` : ""} Vou avisar nos dias de jogo.`, team: found };

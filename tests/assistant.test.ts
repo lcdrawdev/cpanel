@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDatabase, type Database } from "@/server/db/create";
 import { devices } from "@/server/db/schema";
-import { applyEvents, ask, assistantFeed, genreKeys, getProfile, markCard, recordEvents, updateProfile } from "@/server/services/assistant";
+import { applyEvents, ask, assistantFeed, genreKeys, getProfile, markCard, recordEvents, teamsByCountry, updateProfile } from "@/server/services/assistant";
 
 let db: Database;
 let device: { id: string };
@@ -15,6 +15,7 @@ beforeEach(async () => {
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
     const url = String(input);
     calls.push(url);
+    if (url.includes("search_all_teams")) return Response.json({ teams: [{ idTeam: "2", strTeam: "Vasco da Gama", strLeague: "Brazilian Serie A" }, { idTeam: "1", strTeam: "Bahia", strLeague: "Brazilian Serie A" }] });
     if (url.includes("searchteams")) return Response.json({ teams: [{ idTeam: "134287", strTeam: "Flamengo", strBadge: "https://img/fla.png", strSport: "Soccer", strLeague: "Brazilian Serie A" }] });
     if (url.includes("eventsnext")) return Response.json({ events: [{ idEvent: "99", strTimestamp: soon, strHomeTeam: "Vasco da Gama", strAwayTeam: "Flamengo", strLeague: "Brazilian Serie A", strAwayTeamBadge: "https://img/fla.png" }] });
     return Response.json({});
@@ -41,6 +42,25 @@ describe("assistant taste profile", () => {
     expect((await getProfile(db, device)).series[0]).toMatchObject({ following: false, watched: 1, knownEpisodes: 17 });
     await recordEvents(db, device, { events: [ep] });
     expect((await getProfile(db, device)).series[0]).toMatchObject({ following: true, watched: 2 });
+  });
+});
+
+describe("assistant teams and favourites", () => {
+  it("lists a country's clubs and resolves the chosen one", async () => {
+    expect(teamsByCountry("Brazil").map((t) => t.name)).toContain("Flamengo");
+    expect(teamsByCountry("Atlantis")).toEqual([]);
+    // A club from the table gets its provider id when saved.
+    // The TV leaves out null fields.
+    await updateProfile(db, device, { teams: [{ id: "", name: "Flamengo", sport: "Soccer", country: "Brazil" }] });
+    expect((await getProfile(db, device)).teams[0]).toMatchObject({ id: "134287", name: "Flamengo" });
+  });
+
+  it("keeps one favourite team and counts a favourite series' genres", async () => {
+    await expect(updateProfile(db, device, { teams: [{ id: "1", name: "A", badge: null, sport: null }, { id: "2", name: "B", badge: null, sport: null }] })).rejects.toThrow();
+    await updateProfile(db, device, { series: [{ seriesId: "77", playlistId: "p1", name: "Dark", poster: null, following: true, genres: ["Drama, Mistério"] }] });
+    const p = await getProfile(db, device);
+    expect(p.series[0]).toMatchObject({ seriesId: "77", following: true });
+    expect(p.genres).toEqual({ drama: 60, misterio: 60 });
   });
 });
 
