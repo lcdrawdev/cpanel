@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // PGlite ships WASM + data files that must be loaded from node_modules at runtime.
   serverExternalPackages: ["@electric-sql/pglite"],
+  // Read at runtime from disk: SQL migrations (applied when the database opens) and the Supabase certificate.
+  outputFileTracingIncludes: { "/**": ["./drizzle/**", "./certs/**"] },
   turbopack: {
     rules: {
       "*.css": {

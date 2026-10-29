@@ -8,8 +8,10 @@ import { apiError } from "@/server/http/device-route";
 // refetches /config right away instead of waiting for its next poll.
 const CHECK_MS = 2_000;
 const KEEPALIVE_MS = 25_000;
+// Vercel ends a function after this many seconds; the TV reconnects on its own (polling covers the gap).
+export const maxDuration = 300;
 // Connections are recycled; the app reconnects (EventSource does it automatically).
-const MAX_LIFETIME_MS = 10 * 60_000;
+const MAX_LIFETIME_MS = process.env.VERCEL ? 280_000 : 10 * 60_000;
 
 export async function GET(request: Request) {
   let device;
