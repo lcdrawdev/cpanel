@@ -9,9 +9,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  // Browser extensions (e.g. one that adds gan-extension-id, Grammarly) write attributes on <html>/<body>
+  // before React loads; suppressHydrationWarning ignores those, and only on these two tags.
   return (
-    <html lang="pt-BR">
-      <body>{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
