@@ -286,6 +286,54 @@ export const auditLog = pgTable("audit_log", {
   createdAt: createdAt(),
 });
 
+// ---------- Smart TV assistant (docs: "Assistente Inteligente de TV") ----------
+
+export type AssistantTeam = { id: string; name: string; badge: string | null; sport: string | null };
+export type AssistantSeries = {
+  seriesId: string;
+  playlistId: string;
+  name: string;
+  poster: string | null;
+  /** Episodes watched before following (auto-follow after 2). */
+  watched: number;
+  following: boolean;
+  /** Episode count the device was last told about; a bigger count on the server = new episode. */
+  knownEpisodes: number | null;
+};
+export type AssistantFinished = { title: string; kind: "movie" | "series"; tmdbId: number | null; year: string | null; at: string };
+
+/** One row per TV: what it likes, built from what it watches. Weights decay by half every 30 days. */
+export const assistantProfiles = pgTable("assistant_profiles", {
+  deviceId: uuid("device_id").primaryKey().references(() => devices.id, { onDelete: "cascade" }),
+  teams: jsonb("teams").$type<AssistantTeam[]>().notNull().default([]),
+  series: jsonb("series").$type<AssistantSeries[]>().notNull().default([]),
+  genres: jsonb("genres").$type<Record<string, number>>().notNull().default({}),
+  kinds: jsonb("kinds").$type<Record<string, number>>().notNull().default({}),
+  hours: jsonb("hours").$type<Record<string, number>>().notNull().default({}),
+  finished: jsonb("finished").$type<AssistantFinished[]>().notNull().default([]),
+  decayedAt: timestamp("decayed_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: updatedAt(),
+});
+
+/** What the TV did with each card: seen, dismissed or accepted, so it is not shown again. */
+export const assistantCards = pgTable(
+  "assistant_cards",
+  {
+    deviceId: uuid("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+    cardId: text("card_id").notNull(),
+    status: text("status").notNull(),
+    until: timestamp("until", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.deviceId, t.cardId] })],
+);
+
+/** Answers from outside sources shared by every TV (a team's games, a series' episodes, TMDB lookups). */
+export const assistantCache = pgTable("assistant_cache", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<unknown>().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
 export type Admin = typeof admins.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type Playlist = typeof playlists.$inferSelect;
