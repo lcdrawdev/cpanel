@@ -1,4 +1,7 @@
+import { inArray, like, or } from "drizzle-orm";
 import type { DbOrTx } from "../db/create";
+import { assistantCache } from "../db/schema";
+import { shared } from "./assistant";
 import { decryptSecret, encryptSecret } from "../crypto";
 import { getAccountSettings, save } from "./account-settings";
 import { ServiceError } from "./errors";
@@ -24,24 +27,14 @@ export const STANDINGS_LEAGUES = [
   { id: "4334", name: "Ligue 1" },
 ] as const;
 
-type Entry<T> = { at: number; value: T };
-const cache = new Map<string, Entry<unknown>>();
-/** Names waiting for a lookup, filled slowly in the background (the free key allows ~30 calls a minute). */
-const pending = new Set<string>();
-let filling = false;
-
+// Answers are kept in the database (assistant_cache), shared by every panel instance and kept across
+// restarts: on Vercel there is no long-lived process to remember them or to keep looking things up.
 async function sportsDbKey(db: DbOrTx) {
   const s = await getAccountSettings(db);
   return s.sportsDbKey ? decryptSecret(s.sportsDbKey) : FREE_KEY;
 }
 
-async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
-  const hit = cache.get(key) as Entry<T> | undefined;
-  if (hit && Date.now() - hit.at < ttlMs) return hit.value;
-  const value = await load();
-  cache.set(key, { at: Date.now(), value });
-  return value;
-}
+
 
 async function getJson(url: string) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000), cache: "no-store" });
@@ -69,42 +62,41 @@ async function lookupBadge(key: string, apiKey: string): Promise<string | null> 
   return null;
 }
 
+/** New names looked up per request; the TV asks again every 20 s, which stays under the free key's limit. */
+const LOOKUPS_PER_CALL = 6;
+
 /**
- * Crests for the given team names. Known ones come from the cache right away; unknown ones are looked up
- * in the background, so the app asks again a little later and the crests appear as they arrive.
+ * Crests for the given team names. Known ones (found or not) come from the database; a few unknown ones are
+ * looked up on each call and saved, so the TV asks again a little later and the rest arrive.
  */
 export async function teamBadges(db: DbOrTx, names: string[]) {
   const apiKey = await sportsDbKey(db);
-  const out: Record<string, string | null> = {};
+  const byKey = new Map<string, string[]>();
   for (const name of names.slice(0, 120)) {
     const key = teamKey(name);
-    if (!key) continue;
-    const hit = cache.get(`badge:${key}`) as Entry<string | null> | undefined;
-    if (hit && Date.now() - hit.at < 7 * DAY) out[name] = hit.value;
-    else pending.add(key);
+    if (key) byKey.set(key, [...(byKey.get(key) ?? []), name]);
   }
-  if (pending.size && !filling) void fillPending(apiKey);
+  const rows = byKey.size ? await db.select().from(assistantCache).where(inArray(assistantCache.key, [...byKey.keys()].map((k) => `badge:${k}`))) : [];
+  const known = new Map(rows.filter((r) => r.expiresAt.getTime() > Date.now()).map((r) => [r.key.slice(6), (r.value as { url: string | null }).url]));
+  let lookups = 0;
+  for (const key of byKey.keys()) {
+    if (known.has(key) || lookups >= LOOKUPS_PER_CALL) continue;
+    lookups++;
+    try {
+      const url = await lookupBadge(key, apiKey);
+      // A team the provider does not know is asked again after a week.
+      const expiresAt = new Date(Date.now() + (url ? 30 : 7) * DAY);
+      await db.insert(assistantCache).values({ key: `badge:${key}`, value: { url }, expiresAt })
+        .onConflictDoUpdate({ target: assistantCache.key, set: { value: { url }, expiresAt } });
+      known.set(key, url);
+    } catch (e) {
+      if (e instanceof ServiceError && e.code === "sports_rate_limited") break;
+    }
+  }
+  const out: Record<string, string | null> = {};
+  for (const [key, list] of byKey) if (known.has(key)) for (const n of list) out[n] = known.get(key) ?? null;
   return { badges: out, pending: names.filter((n) => !(n in out)).length };
 }
-
-async function fillPending(apiKey: string) {
-  filling = true;
-  try {
-    while (pending.size) {
-      const key = pending.values().next().value as string;
-      pending.delete(key);
-      try {
-        cache.set(`badge:${key}`, { at: Date.now(), value: await lookupBadge(key, apiKey) });
-      } catch (e) {
-        if (e instanceof ServiceError && e.code === "sports_rate_limited") { pending.add(key); await new Promise((r) => setTimeout(r, 60_000)); }
-      }
-      await new Promise((r) => setTimeout(r, 2_100)); // ~28 calls a minute, under the free limit
-    }
-  } finally {
-    filling = false;
-  }
-}
-
 type TableRow = {
   intRank: string; strTeam: string; strBadge?: string | null; intPlayed: string; intWin: string; intDraw: string; intLoss: string;
   intGoalsFor: string; intGoalsAgainst: string; intGoalDifference: string; intPoints: string; strForm?: string | null; strDescription?: string | null;
@@ -115,11 +107,12 @@ export async function standings(db: DbOrTx, leagueId: string) {
   const league = STANDINGS_LEAGUES.find((l) => l.id === leagueId);
   if (!league) throw new ServiceError("not_found", "Campeonato não disponível.", 404);
   const apiKey = await sportsDbKey(db);
-  const info = await cached(`league:${leagueId}`, DAY, async () => {
+  const info = await shared(db, `league:${leagueId}`, DAY, async () => {
     const l = (await getJson(`${SPORTSDB}/${apiKey}/lookupleague.php?id=${leagueId}`))?.leagues?.[0];
     return { season: (l?.strCurrentSeason as string) ?? "", badge: (l?.strBadge as string | null) ?? null };
   });
-  const rows = await cached(`table:${leagueId}:${info.season}`, 30 * 60_000, async () => {
+  if (!info) throw new ServiceError("sports_unavailable", "Não foi possível consultar o campeonato agora.", 502);
+  const rows = (await shared(db, `table:${leagueId}:${info.season}`, 30 * 60_000, async () => {
     const data = await getJson(`${SPORTSDB}/${apiKey}/lookuptable.php?l=${leagueId}&s=${encodeURIComponent(info.season)}`);
     return ((data?.table ?? []) as TableRow[]).map((r) => ({
       rank: Number(r.intRank), team: r.strTeam, badge: r.strBadge ?? null,
@@ -127,7 +120,7 @@ export async function standings(db: DbOrTx, leagueId: string) {
       goalsFor: Number(r.intGoalsFor), goalsAgainst: Number(r.intGoalsAgainst), goalDiff: Number(r.intGoalDifference),
       points: Number(r.intPoints), form: r.strForm ?? null, zone: r.strDescription ?? null,
     }));
-  });
+  })) ?? [];
   return { id: league.id, name: league.name, season: info.season, badge: info.badge, rows, partial: apiKey === FREE_KEY };
 }
 
@@ -174,7 +167,7 @@ async function footballDay(db: DbOrTx): Promise<LiveFixture[]> {
   if (!s.apiSportsKey) return [];
   const key = decryptSecret(s.apiSportsKey);
   const date = todayInListZone();
-  return cached(`football:${date}`, FOOTBALL_REFRESH_MS, async () => {
+  return (await shared<LiveFixture[]>(db, `football:${date}`, FOOTBALL_REFRESH_MS, async () => {
     const res = await fetch(`${API_FOOTBALL}/fixtures?date=${date}&timezone=${encodeURIComponent(LIST_ZONE)}`, {
       headers: { "x-apisports-key": key }, signal: AbortSignal.timeout(20_000), cache: "no-store",
     });
@@ -193,7 +186,7 @@ async function footballDay(db: DbOrTx): Promise<LiveFixture[]> {
       state: fixtureState(f.fixture.status.short), statusShort: f.fixture.status.short, elapsed: f.fixture.status.elapsed,
       goalsHome: f.goals.home, goalsAway: f.goals.away,
     }));
-  });
+  })) ?? [];
 }
 
 /** Same team? Equal reduced names, one inside the other ("Inter" / "Inter Milan"), or most words shared. */
@@ -242,6 +235,6 @@ export async function updateSportsDataKeys(db: DbOrTx, actor: string, input: { s
   else if (input.apiSportsKey.trim()) values.apiSportsKey = encryptSecret(input.apiSportsKey.trim());
   await getAccountSettings(db);
   await save(db, values);
-  cache.clear();
+  await db.delete(assistantCache).where(or(like(assistantCache.key, "badge:%"), like(assistantCache.key, "league:%"), like(assistantCache.key, "table:%"), like(assistantCache.key, "football:%")));
   await audit(db, actor, "sports_data.keys_updated");
 }

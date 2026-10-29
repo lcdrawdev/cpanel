@@ -26,7 +26,7 @@ const memo = new Map<string, { exp: number; value: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 
 /** Value for [key], loaded at most once per [ttlMs] for all TVs; a failed refresh falls back to the stale value. */
-async function shared<T>(db: DbOrTx, key: string, ttlMs: number, load: () => Promise<T>): Promise<T | null> {
+export async function shared<T>(db: DbOrTx, key: string, ttlMs: number, load: () => Promise<T>): Promise<T | null> {
   const now = Date.now();
   const mem = memo.get(key);
   if (mem && mem.exp > now) return mem.value as T;

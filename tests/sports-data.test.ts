@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDatabase, type Database } from "@/server/db/create";
-import { liveMatches, sameTeam, standings, teamKey, updateSportsDataKeys } from "@/server/services/sports-data";
+import { liveMatches, sameTeam, standings, teamBadges, teamKey, updateSportsDataKeys } from "@/server/services/sports-data";
 
 let db: Database;
 
@@ -18,6 +18,22 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("sports data", () => {
+  it("keeps crests in the database and looks up only a few new names per call", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      calls++;
+      const t = new URL(String(input)).searchParams.get("t") ?? "";
+      return Response.json({ teams: [{ strTeam: t, strBadge: `https://img/${t}.png` }] });
+    }));
+    const names = Array.from({ length: 8 }, (_, i) => `Time Numero ${i + 1}`);
+    const first = await teamBadges(db, names);
+    expect(Object.keys(first.badges)).toHaveLength(6);
+    expect(first.pending).toBe(2);
+    const second = await teamBadges(db, names);
+    expect(Object.keys(second.badges)).toHaveLength(8);
+    expect(calls).toBe(8);
+    expect(second.badges["Time Numero 1"]).toBe("https://img/time numero 1.png/small");
+  });
   it("reduces list team names to what the provider searches", () => {
     expect(teamKey("Club América")).toBe("america");
     expect(teamKey("São Paulo FC")).toBe("sao paulo");
