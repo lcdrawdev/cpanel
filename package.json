@@ -12,7 +12,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "simulate:device": "node scripts/simulate-device.mjs"
+    "simulate:device": "node scripts/simulate-device.mjs",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

@@ -17,11 +17,15 @@ const migrationsFolder = path.join(process.cwd(), "drizzle");
  * - `databaseUrl` set: real PostgreSQL (production).
  * - otherwise: embedded PGlite at `pgliteDir`, or in memory when `pgliteDir` is "memory://".
  */
-export async function createDatabase(opts: { databaseUrl?: string; pgliteDir?: string }): Promise<Database> {
+export async function createDatabase(opts: { databaseUrl?: string; pgliteDir?: string; migrate?: boolean }): Promise<Database> {
+  // Migrations run when opening PGlite (local/tests), but NOT when connecting to production PostgreSQL: Supabase's
+  // transaction pooler, which Vercel has to use, rejects the migrator (CREATE SCHEMA "drizzle" fails). In production
+  // the schema is applied once by `npm run db:migrate` against the direct connection, not on every request.
+  const migrate = opts.migrate ?? !opts.databaseUrl;
   if (opts.databaseUrl) {
     const pool = new Pool({ connectionString: opts.databaseUrl, ssl: sslFor(opts.databaseUrl), max: Number(process.env.DATABASE_POOL_MAX ?? 5) });
     const db = drizzlePg(pool, { schema });
-    await migratePg(db, { migrationsFolder });
+    if (migrate) await migratePg(db, { migrationsFolder });
     // Both drivers expose the same query builder; the cast keeps one type across the app.
     return db as unknown as Database;
   }
@@ -29,7 +33,7 @@ export async function createDatabase(opts: { databaseUrl?: string; pgliteDir?: s
   if (!dataDir.startsWith("memory://")) mkdirSync(path.dirname(dataDir), { recursive: true });
   const client = new PGlite(dataDir);
   const db = drizzlePglite(client, { schema });
-  await migratePglite(db, { migrationsFolder });
+  if (migrate) await migratePglite(db, { migrationsFolder });
   return db;
 }
 
