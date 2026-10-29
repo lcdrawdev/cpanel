@@ -36,6 +36,15 @@ describe("assistant taste profile", () => {
     expect(p.finished[0]).toMatchObject({ title: "Ponto Sem Retorno (2026)", kind: "movie" });
   });
 
+  it("weighs genres by the answer to Você gostou do filme?", () => {
+    const start = { genres: { terror: 50, comedia: 30 }, kinds: {}, hours: {}, finished: [], series: [], decayedAt: new Date() };
+    const p = applyEvents(start, [
+      { kind: "movie", title: "A", genres: ["Terror"], minutes: 0, finished: false, liked: false },
+      { kind: "movie", title: "B", genres: ["Comédia"], minutes: 0, finished: false, liked: true },
+    ]);
+    expect(p.genres).toEqual({ comedia: 120 });
+  });
+
   it("follows a series after two finished episodes", async () => {
     const ep = { kind: "series" as const, title: "Lupin", genres: ["Crime"], minutes: 45, finished: true, seriesId: "8812", playlistId: "p1", episodes: 17 };
     await recordEvents(db, device, { events: [ep] });

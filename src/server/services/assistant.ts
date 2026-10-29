@@ -112,6 +112,8 @@ export const eventsSchema = z.object({
     poster: z.string().max(600).nullable().optional(),
     /** Episodes the TV saw in the series when it was opened (radar baseline). */
     episodes: z.number().int().min(0).max(5000).nullable().optional(),
+    /** Answer to "Você gostou?" at the end of a movie: liked genres gain weight, disliked ones lose it. */
+    liked: z.boolean().optional(),
   })).max(100),
 });
 
@@ -135,6 +137,12 @@ export function applyEvents(p: Taste, events: z.infer<typeof eventsSchema>["even
   let finished = [...p.finished];
   const series = p.series.map((s) => ({ ...s }));
   for (const e of events) {
+    if (e.liked != null) {
+      for (const g of genreKeys(e.genres)) {
+        const w = (genres[g] ?? 0) + (e.liked ? 90 : -60);
+        if (w > 0) genres[g] = w; else delete genres[g];
+      }
+    }
     const m = Math.min(e.minutes, 240);
     if (m < 1) continue;
     for (const g of genreKeys(e.genres)) genres[g] = (genres[g] ?? 0) + m;
