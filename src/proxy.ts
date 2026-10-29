@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Optimistic check only (cookie present). The real session check runs in the
 // Data Access Layer (server/session.ts) on every page section and action.
-const PUBLIC = ["/login", "/setup"];
+const PUBLIC = ["/login", "/setup", "/ativar"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

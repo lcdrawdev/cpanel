@@ -92,6 +92,13 @@ export const devices = pgTable("devices", {
   customerName: text("customer_name").notNull().default(""),
   // Device-only values on top of the profile (reference: device panel General/Advanced Settings).
   settingsOverrides: jsonb("settings_overrides").$type<Record<string, unknown>>().notNull().default({}),
+  // First access from the TV (Ativação do Dispositivo): the TV shows a MAC-style id and a 6-digit code,
+  // the customer confirms both on the /ativar page. Only the code's hash is stored.
+  mac: text("mac").unique(),
+  selfRegistered: boolean("self_registered").notNull().default(false),
+  pairingCodeHash: text("pairing_code_hash"),
+  pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true }),
+  pairingAttempts: integer("pairing_attempts").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

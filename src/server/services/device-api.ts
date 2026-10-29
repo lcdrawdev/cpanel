@@ -39,6 +39,8 @@ export async function activateDevice(db: Database, input: z.infer<typeof activat
 
   if (existing) {
     if (existing.status === "blocked") throw new ServiceError("device_blocked", "Dispositivo bloqueado pelo administrador.", 403);
+    // Registered by the TV itself (first access): it only gets a token after the code is confirmed on /ativar.
+    if (existing.selfRegistered && existing.status !== "active") throw new ServiceError("awaiting_activation", "Aguardando a ativação pelo site.", 409);
     await db
       .update(devices)
       .set({ ...meta, status: "active", tokenHash: sha256(token), updatedAt: new Date() })

@@ -92,6 +92,13 @@
       "when": 1793266897391,
       "tag": "0012_assistant",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793285075108,
+      "tag": "0013_device_pairing",
+      "breakpoints": true
     }
   ]
 }
