@@ -18,6 +18,7 @@ import { addFavorite, removeFavorite, setDeviceSync, setSyncPlaylists, updateSyn
 import { hideSportEntry, unhideSportEntry, updateSportsMode } from "@/server/services/sports";
 import { updateSportsDataKeys } from "@/server/services/sports-data";
 import { addArtwork, moveArtwork, removeArtwork } from "@/server/services/artwork";
+import { importUpdate, publishUpdate, deleteUpdate, type Platform } from "@/server/services/app-updates";
 import { clearDeviceOverrides, setDeviceOverrides } from "@/server/services/device-settings";
 import { copyDevice, createSnapshot, deleteSnapshot, restoreSnapshot } from "@/server/services/snapshots";
 import { createApiKey, revokeApiKey } from "@/server/services/integrations";
@@ -126,6 +127,41 @@ export async function removeDisconnectedDevicesAction(_p: ActionResult, form: Fo
   return run(async (actor) => {
     const n = await removeDisconnectedDevices(await getDb(), actor);
     return n === 0 ? "Nenhum dispositivo desconectado para excluir." : `${n} ${n === 1 ? "dispositivo desconectado removido" : "dispositivos desconectados removidos"}. Ficaram só os online.`;
+  });
+}
+
+// ---------- Atualizações do app ----------
+export async function importUpdateAction(_p: ActionResult, form: FormData) {
+  return run(async (actor) => {
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new ServiceError("invalid", "Escolha o arquivo do app (APK).");
+    const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    await importUpdate(await getDb(), actor, {
+      platform: str(form, "platform") as Platform,
+      version: str(form, "version"),
+      versionCode: Number(str(form, "versionCode")) || 0,
+      notes: str(form, "notes"),
+      mandatory: str(form, "mandatory") === "on",
+      fileName: file.name,
+      fileSize: file.size,
+      base64,
+    });
+    return `Arquivo importado (${(file.size / 1_048_576).toFixed(1)} MB). Clique em “Enviar atualização” para liberar.`;
+  });
+}
+
+export async function publishUpdateAction(_p: ActionResult, form: FormData) {
+  return run(async (actor) => {
+    const publish = str(form, "published") === "true";
+    await publishUpdate(await getDb(), actor, str(form, "platform") as Platform, publish);
+    return publish ? "Atualização enviada. As TVs online vão receber o aviso." : "Envio pausado.";
+  });
+}
+
+export async function deleteUpdateAction(_p: ActionResult, form: FormData) {
+  return run(async (actor) => {
+    await deleteUpdate(await getDb(), actor, str(form, "platform") as Platform);
+    return "Atualização removida.";
   });
 }
 

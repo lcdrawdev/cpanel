@@ -47,6 +47,7 @@ export const NAV: Group[] = [
       { href: "/aparencia", label: "Aparência e início" },
       { href: "/capas", label: "Capas e logos" },
       { href: "/avisos", label: "Avisos" },
+      { href: "/atualizacoes", label: "Atualizações" },
     ],
   },
   { label: "Portal pré-definido", icon: Server, items: [{ href: "/portal-predefinido", label: "Configuração" }] },

@@ -344,6 +344,26 @@ export const assistantCache = pgTable("assistant_cache", {
   value: jsonb("value").$type<unknown>().notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
+
+/**
+ * App update per platform (reference: App da TV › Atualizações). One row per platform; the imported
+ * package is kept as base64 in `fileData` (APKs are a few MB). `published` turns the update on: TVs on
+ * that platform then see the prompt when their installed version is older. The non-Android platforms
+ * (tizen/webos/roku) keep the version/file here but update through their own stores.
+ */
+export const appUpdates = pgTable("app_updates", {
+  platform: platformEnum("platform").primaryKey(),
+  version: text("version").notNull(),
+  versionCode: integer("version_code").notNull().default(0),
+  notes: text("notes").notNull().default(""),
+  mandatory: boolean("mandatory").notNull().default(false),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileData: text("file_data").notNull(), // base64 do pacote (APK)
+  published: boolean("published").notNull().default(false),
+  updatedAt: updatedAt(),
+});
+
 export type Admin = typeof admins.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type Playlist = typeof playlists.$inferSelect;

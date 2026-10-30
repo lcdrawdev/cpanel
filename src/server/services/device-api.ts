@@ -10,6 +10,7 @@ import { applyGroup } from "./groups";
 import { accountConfig, getAccountSettings } from "./account-settings";
 import { messagesForDevice } from "./messages";
 import { artworkConfig } from "./artwork";
+import { publishedUpdateFor } from "./app-updates";
 import { ServiceError } from "./errors";
 import { audit } from "./audit";
 import { notify } from "./notifications";
@@ -134,6 +135,8 @@ export async function deviceConfig(db: DbOrTx, deviceUuid: string) {
     messages: await messagesForDevice(db, device),
     // Service logos and folder covers linked in Capas e logos.
     artwork: await artworkConfig(db),
+    // Published app update for this device's platform (the TV compares versionCode and offers to install).
+    update: await publishedUpdateFor(db, device.platform),
   };
 }
 
