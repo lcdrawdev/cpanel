@@ -168,6 +168,8 @@ a { color: var(--color-primary); }
 
 /* ---------------- Tabela (vira cartões < 1024px) ---------------- */
 .table-tools { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+.bulk-tools { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--color-border); background: var(--color-surface-muted); }
+.t-actions { display: flex; gap: var(--space-2); align-items: center; justify-content: flex-end; }
 .search { position: relative; flex: 1; max-width: 420px; min-width: 200px; }
 .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
 .search .input { padding-left: 38px; }

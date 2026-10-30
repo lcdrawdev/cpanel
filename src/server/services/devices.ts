@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../db/create";
 import { deviceGroups, devicePlaylists, devices, playlists, settingsProfiles } from "../db/schema";
 import { ServiceError } from "./errors";
@@ -127,9 +127,25 @@ export async function setDeviceBlocked(db: Database, actor: string, id: string, 
 }
 
 export async function removeDevice(db: Database, actor: string, id: string) {
+  // The device's playlist links go with it (devicePlaylists FK is ON DELETE CASCADE): unlink + delete.
   const [removed] = await db.delete(devices).where(eq(devices.id, id)).returning({ nickname: devices.nickname, deviceId: devices.deviceId });
   await audit(db, actor, "device.removed", id);
   if (removed) await notify(db, "device_removed", `Dispositivo removido: ${removed.nickname}`, `O dispositivo "${removed.nickname}" (Device ID ${removed.deviceId}) foi removido por ${actor}.`);
+}
+
+/** How many devices are not online now (never connected, or last seen before the online window). */
+export async function disconnectedCount(db: Database) {
+  const since = new Date(Date.now() - ONLINE_WINDOW_MS);
+  const [row] = await db.select({ n: count() }).from(devices).where(or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, since)));
+  return row.n;
+}
+
+/** Removes every device that is not online now, keeping only the ones seen in the last few minutes. */
+export async function removeDisconnectedDevices(db: Database, actor: string) {
+  const since = new Date(Date.now() - ONLINE_WINDOW_MS);
+  const removed = await db.delete(devices).where(or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, since))).returning({ id: devices.id });
+  if (removed.length) await audit(db, actor, "device.removed_disconnected", `${removed.length}`);
+  return removed.length;
 }
 
 export async function recentlySeen(db: Database, limit = 5) {

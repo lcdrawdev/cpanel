@@ -320,12 +320,12 @@ function ActionsSection({ device }: { device: Device }) {
         </div>
         <div className="setting">
           <div className="s-text">
-            <strong>Remover dispositivo</strong>
+            <strong>Desvincular e excluir</strong>
             <span>Apaga o cadastro, o vínculo com playlists e o token. Não pode ser desfeito.</span>
           </div>
           <form action={removeDeviceAction}>
             <input type="hidden" name="id" value={device.id} />
-            <ConfirmSubmit message={`Remover “${device.nickname}”? Esta ação não pode ser desfeita.`}>Remover</ConfirmSubmit>
+            <ConfirmSubmit message={`Desvincular e excluir “${device.nickname}”? Esta ação não pode ser desfeita.`}>Desvincular e excluir</ConfirmSubmit>
           </form>
         </div>
       </div>

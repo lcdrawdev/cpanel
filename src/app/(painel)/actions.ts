@@ -6,7 +6,7 @@ import { getDb } from "@/server/db/client";
 import { requireAdmin } from "@/server/session";
 import { ServiceError } from "@/server/services/errors";
 import { changePassword } from "@/server/services/admins";
-import { addDevice, removeDevice, renameDevice, setDeviceBlocked, setDevicePlan, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
+import { addDevice, removeDevice, removeDisconnectedDevices, renameDevice, setDeviceBlocked, setDevicePlan, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
 import { createCode, deleteCode, setCodeEnabled } from "@/server/services/codes";
 import { createProfile, deleteProfile, updateProfileSettings } from "@/server/services/profiles";
 import { connectDeviceXtream, createPlaylist, deletePlaylist, updatePlaylist, type PlaylistInput } from "@/server/services/playlists";
@@ -119,6 +119,14 @@ export async function removeDeviceAction(form: FormData) {
   const admin = await requireAdmin();
   await removeDevice(await getDb(), admin.email, str(form, "id"));
   redirect("/dispositivos");
+}
+
+export async function removeDisconnectedDevicesAction(_p: ActionResult, form: FormData) {
+  void form;
+  return run(async (actor) => {
+    const n = await removeDisconnectedDevices(await getDb(), actor);
+    return n === 0 ? "Nenhum dispositivo desconectado para excluir." : `${n} ${n === 1 ? "dispositivo desconectado removido" : "dispositivos desconectados removidos"}. Ficaram só os online.`;
+  });
 }
 
 // ---------- Códigos ----------

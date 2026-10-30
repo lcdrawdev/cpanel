@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { MonitorSmartphone, Search, SlidersHorizontal } from "lucide-react";
+import { MonitorSmartphone, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Card, CardHead, EmptyState, PageHeader, SkeletonCard } from "@/components/ui";
 import { AddDeviceButton } from "@/components/add-device";
+import { ConfirmSubmit } from "@/components/forms";
 import { DeviceStatus, OnlineState, PLATFORM_LABEL } from "@/components/device-bits";
 import { getDb } from "@/server/db/client";
 import { requireAdmin } from "@/server/session";
-import { listDevices } from "@/server/services/devices";
+import { disconnectedCount, listDevices } from "@/server/services/devices";
+import { removeDeviceAction, removeDisconnectedDevicesAction } from "../actions";
+import { ActionForm } from "@/components/forms";
 
 export const metadata: Metadata = { title: "Dispositivos" };
 
@@ -33,7 +36,9 @@ async function DeviceTable({ searchParams }: { searchParams: PageProps<"/disposi
   await requireAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
-  const devices = await listDevices(await getDb(), q);
+  const db = await getDb();
+  const devices = await listDevices(db, q);
+  const disconnected = await disconnectedCount(db);
   return (
     <Card>
       <CardHead icon={MonitorSmartphone} overline="Gestão na nuvem" title="Todos os dispositivos" description={`${devices.length} ${devices.length === 1 ? "dispositivo" : "dispositivos"}`} />
@@ -45,6 +50,16 @@ async function DeviceTable({ searchParams }: { searchParams: PageProps<"/disposi
         </div>
         <button className="btn btn-secondary">Buscar</button>
       </form>
+      {disconnected > 0 && (
+        <ActionForm action={removeDisconnectedDevicesAction} className="bulk-tools">
+          <p className="hint" style={{ margin: 0, flex: 1 }}>
+            {disconnected} {disconnected === 1 ? "dispositivo desconectado" : "dispositivos desconectados"} (sem conexão nos últimos 5 minutos). Limpe os de teste e deixe só os que estão online.
+          </p>
+          <ConfirmSubmit message={`Desvincular e excluir os ${disconnected} dispositivos desconectados? Fica só o que está online agora. Esta ação não pode ser desfeita.`}>
+            Excluir desconectados
+          </ConfirmSubmit>
+        </ActionForm>
+      )}
       {devices.length === 0 ? (
         <EmptyState icon={MonitorSmartphone} title={q ? "Nenhum resultado" : "Nenhum dispositivo cadastrado"} text={q ? "Ajuste a busca." : "Adicione um Device ID ou ative pelo app com um código."} action={q ? undefined : <AddDeviceButton />} />
       ) : (
@@ -66,6 +81,12 @@ async function DeviceTable({ searchParams }: { searchParams: PageProps<"/disposi
                 <td data-label="Conexão"><OnlineState lastSeenAt={d.lastSeenAt} online={d.online} /></td>
                 <td className="t-actions">
                   <Link href={`/dispositivos/${d.id}`} className="btn btn-success btn-sm"><SlidersHorizontal size={16} aria-hidden="true" /> Painel</Link>
+                  <form action={removeDeviceAction} style={{ display: "inline" }}>
+                    <input type="hidden" name="id" value={d.id} />
+                    <ConfirmSubmit message={`Desvincular e excluir “${d.nickname}” (${d.deviceId})? O aparelho perde o vínculo com as listas e sai do painel. Esta ação não pode ser desfeita.`} variant="danger btn-sm">
+                      <Trash2 size={16} aria-hidden="true" /> Excluir
+                    </ConfirmSubmit>
+                  </form>
                 </td>
               </tr>
             ))}
