@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { MonitorSmartphone, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { MonitorSmartphone, Power, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Card, CardHead, EmptyState, PageHeader, SkeletonCard } from "@/components/ui";
 import { AddDeviceButton } from "@/components/add-device";
 import { ConfirmSubmit } from "@/components/forms";
@@ -9,7 +9,7 @@ import { DeviceStatus, OnlineState, PLATFORM_LABEL } from "@/components/device-b
 import { getDb } from "@/server/db/client";
 import { requireAdmin } from "@/server/session";
 import { disconnectedCount, listDevices } from "@/server/services/devices";
-import { removeDeviceAction, removeDisconnectedDevicesAction } from "../actions";
+import { activateDeviceAction, removeDeviceAction, removeDisconnectedDevicesAction } from "../actions";
 import { ActionForm } from "@/components/forms";
 
 export const metadata: Metadata = { title: "Dispositivos" };
@@ -80,6 +80,14 @@ async function DeviceTable({ searchParams }: { searchParams: PageProps<"/disposi
                 <td data-label="Status"><DeviceStatus status={d.status} /></td>
                 <td data-label="Conexão"><OnlineState lastSeenAt={d.lastSeenAt} online={d.online} /></td>
                 <td className="t-actions">
+                  {d.status === "pending" && (
+                    <ActionForm action={activateDeviceAction}>
+                      <input type="hidden" name="id" value={d.id} />
+                      <ConfirmSubmit message={`Ativar “${d.nickname}” agora? A TV entra sozinha em segundos.`} variant="primary btn-sm">
+                        <Power size={16} aria-hidden="true" /> Ativar
+                      </ConfirmSubmit>
+                    </ActionForm>
+                  )}
                   <Link href={`/dispositivos/${d.id}`} className="btn btn-success btn-sm"><SlidersHorizontal size={16} aria-hidden="true" /> Painel</Link>
                   <form action={removeDeviceAction} style={{ display: "inline" }}>
                     <input type="hidden" name="id" value={d.id} />

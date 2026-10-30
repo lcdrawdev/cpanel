@@ -6,7 +6,7 @@ import { getDb } from "@/server/db/client";
 import { requireAdmin } from "@/server/session";
 import { ServiceError } from "@/server/services/errors";
 import { changePassword } from "@/server/services/admins";
-import { addDevice, removeDevice, removeDisconnectedDevices, renameDevice, setDeviceBlocked, setDevicePlan, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
+import { addDevice, adminActivateDevice, removeDevice, removeDisconnectedDevices, renameDevice, setDeviceBlocked, setDevicePlan, setDevicePlaylists, setDeviceProfile } from "@/server/services/devices";
 import { createCode, deleteCode, setCodeEnabled } from "@/server/services/codes";
 import { createProfile, deleteProfile, updateProfileSettings } from "@/server/services/profiles";
 import { connectDeviceXtream, createPlaylist, deletePlaylist, updatePlaylist, type PlaylistInput } from "@/server/services/playlists";
@@ -53,6 +53,13 @@ export async function addDeviceAction(_p: ActionResult, form: FormData) {
 
 export async function renameDeviceAction(_p: ActionResult, form: FormData) {
   return run(async (actor) => renameDevice(await getDb(), actor, str(form, "id"), str(form, "nickname"), form.has("customerName") ? str(form, "customerName") : undefined));
+}
+
+export async function activateDeviceAction(_p: ActionResult, form: FormData) {
+  return run(async (actor) => {
+    await adminActivateDevice(await getDb(), actor, str(form, "id"));
+    return "Dispositivo ativado. A TV entra sozinha em alguns segundos (ela verifica a cada poucos segundos).";
+  });
 }
 
 export async function setDevicePlanAction(_p: ActionResult, form: FormData) {

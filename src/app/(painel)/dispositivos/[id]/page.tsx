@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ArrowLeft, CalendarClock, Camera, Info, KeyRound, Layers, ListVideo, Plug, SlidersVertical, MonitorSmartphone, Settings2, ShieldAlert, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, CalendarClock, Camera, Info, KeyRound, Power as Power, Layers, ListVideo, Plug, SlidersVertical, MonitorSmartphone, Settings2, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { Alert, Card, CardHead, EmptyState, Fact, PageHeader, SkeletonCard } from "@/components/ui";
 import { ActionForm, ConfirmSubmit, SubmitButton } from "@/components/forms";
 import { DeviceStatus, PLATFORM_LABEL, PROFILE_PLATFORM_LABEL, formatDate } from "@/components/device-bits";
@@ -17,7 +17,7 @@ import { OverridesSection, CopiesSection } from "./extra-sections";
 import { ServiceError } from "@/server/services/errors";
 import { SETTING_GROUPS, resolveSettings } from "@/shared/settings";
 import {
-  connectDeviceXtreamAction, removeDeviceAction, renameDeviceAction, setDeviceBlockedAction, setDeviceGroupAction, setDevicePlanAction, setDevicePlaylistsAction, setDeviceProfileAction,
+  connectDeviceXtreamAction, removeDeviceAction, renameDeviceAction, setDeviceBlockedAction, activateDeviceAction, setDeviceGroupAction, setDevicePlanAction, setDevicePlaylistsAction, setDeviceProfileAction,
 } from "../../actions";
 
 export const metadata: Metadata = { title: "Painel do dispositivo" };
@@ -98,7 +98,13 @@ function InfoSection({ device, servers }: { device: Device; servers: string[] })
         <CardHead icon={Info} overline="Dispositivo" title="Informações" description="Identificação, versão do app e último contato." />
         <div className="card-body">
           {device.status === "pending" && (
-            <Alert tone="warning">O app ainda não se conectou. Ele aparece como ativo depois da primeira ativação com este Device ID.</Alert>
+            <div style={{ display: "grid", gap: "var(--space-3)" }}>
+              <Alert tone="warning">O app ainda não se conectou. Clique em “Ativar agora” para liberar este aparelho; a TV entra sozinha em segundos.</Alert>
+              <ActionForm action={activateDeviceAction}>
+                <input type="hidden" name="id" value={device.id} />
+                <SubmitButton pendingLabel="Ativando…"><Power size={16} aria-hidden="true" /> Ativar agora</SubmitButton>
+              </ActionForm>
+            </div>
           )}
           <dl className="facts" style={{ margin: 0 }}>
             <Fact label="Device ID"><span className="mono">{device.deviceId}</span></Fact>

@@ -104,6 +104,18 @@ export async function setDevicePlan(db: Database, actor: string, id: string, dat
   await audit(db, actor, "device.plan_set", id);
 }
 
+/**
+ * Admin activation from the panel: marks a device "Aguardando ativação" as active without the customer
+ * typing the code on /ativar. The TV, which keeps polling, then receives its token and opens by itself.
+ */
+export async function adminActivateDevice(db: Database, actor: string, id: string) {
+  const device = await getDevice(db, id);
+  if (device.status === "active") throw new ServiceError("already_active", "Este aparelho já está ativo.");
+  if (device.status === "blocked") throw new ServiceError("device_blocked", "Desbloqueie o aparelho antes de ativar.", 403);
+  await touch(db, id, { status: "active", selfRegistered: false, pairingCodeHash: null, pairingExpiresAt: null, pairingAttempts: 0 });
+  await audit(db, actor, "device.activated_by_admin", id);
+}
+
 export async function setDeviceProfile(db: Database, actor: string, id: string, profileId: string | null) {
   await touch(db, id, { profileId });
   await audit(db, actor, "device.profile_set", id);
