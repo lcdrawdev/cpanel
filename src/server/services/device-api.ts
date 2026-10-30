@@ -136,8 +136,17 @@ export async function deviceConfig(db: DbOrTx, deviceUuid: string) {
     // Service logos and folder covers linked in Capas e logos.
     artwork: await artworkConfig(db),
     // Published app update for this device's platform (the TV compares versionCode and offers to install).
-    update: await publishedUpdateFor(db, device.platform),
+    // The app is a single Android APK for TV and phone, and some devices register as "other" before the
+    // first full handshake, so any Android-family device falls back to the Android TV package.
+    update: await updateForDevice(db, device.platform),
   };
+}
+
+const ANDROID_PLATFORMS = new Set(["android_tv", "android_mobile", "other"]);
+async function updateForDevice(db: DbOrTx, platform: string) {
+  const own = await publishedUpdateFor(db, platform as never);
+  if (own) return own;
+  return ANDROID_PLATFORMS.has(platform) ? publishedUpdateFor(db, "android_tv") : null;
 }
 
 export async function heartbeat(db: Database, deviceUuid: string, input: z.infer<typeof heartbeatSchema>) {
