@@ -3,6 +3,7 @@ import type { Database, DbOrTx } from "../db/create";
 import { appUpdates } from "../db/schema";
 import { ServiceError } from "./errors";
 import { audit } from "./audit";
+import { save as bumpAccountVersion } from "./account-settings";
 
 export type Platform = (typeof appUpdates.$inferSelect)["platform"];
 
@@ -45,6 +46,8 @@ export async function importUpdate(db: Database, actor: string, input: ImportInp
 export async function publishUpdate(db: Database, actor: string, platform: Platform, published: boolean) {
   const [row] = await db.update(appUpdates).set({ published, updatedAt: new Date() }).where(eq(appUpdates.platform, platform)).returning({ version: appUpdates.version });
   if (!row) throw new ServiceError("not_found", "Importe o arquivo antes de enviar.", 404);
+  // Bump the account version so every TV refetches its config on the next poll and sees the update.
+  await bumpAccountVersion(db, {});
   await audit(db, actor, published ? "app_update.published" : "app_update.unpublished", platform);
 }
 
