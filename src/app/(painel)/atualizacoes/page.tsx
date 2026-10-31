@@ -79,7 +79,8 @@ async function UpdatesList() {
                   </div>
                   <div className="field">
                     <label htmlFor={`code-${p}`}>Código {selfUpdating ? "(versionCode)" : "(opcional)"}</label>
-                    <input id={`code-${p}`} name="versionCode" type="number" min={0} className="input" placeholder="52" />
+                    <input id={`code-${p}`} name="versionCode" type="number" min={0} className="input" placeholder={selfUpdating ? "lido do APK" : "52"} />
+                    {selfUpdating ? <p className="hint">Lido automaticamente do APK ao importar. Preencha só para forçar um número.</p> : null}
                   </div>
                 </div>
                 <div className="field">
